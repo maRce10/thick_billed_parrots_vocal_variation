@@ -4,7 +4,7 @@ subtitle: Acoustic analysis
 author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a> 
 date: "`r Sys.Date()`"
 toc: true
-toc-depth: 2
+toc-depth: 4
 toc-location: left
 number-sections: true
 highlight-style: pygments
@@ -14,6 +14,9 @@ format:
     code-fold: true
     code-tools: true
     css: qmd.css
+    fig-height: 4
+    fig-format: png
+    fig-dpi: 200    
 editor_options: 
   chunk_output_type: console
 ---
@@ -52,13 +55,8 @@ knitr::opts_chunk$set(
   message = FALSE
  )
 
-# funnction to print tables in html format 
-print_kable <- function(x) {
-    kb <- kable(x, row.names = TRUE, digits = 4, "html")
-    kb <- kable_styling(kb,
-                        bootstrap_options = c("striped", "hover", "condensed", "responsive"))
-    scroll_box(kb, width = "100%")
-}
+# ggplot font size
+bs <- 12
 ```
 
 
@@ -87,13 +85,12 @@ print_kable <- function(x) {
 
 :::
 
-&nbsp;
 
 # Analysis flowchart {.unnumbered .unlisted}
 ```{mermaid}
 
-flowchart
-  A[Read data] --> B(Create extended<br>selection tables) 
+flowchart LR
+  A(Read data) --> B(Create extended<br>selection tables) 
   B --> C(Measure acoustic<br>features)
   C --> D(Explore acoustic spaces)
 
@@ -103,7 +100,6 @@ style C fill:#26828E4D
 style D fill:#6DCD594D
 
 ```
-
 
 # Load packages {.unnumbered .unlisted}
 
@@ -118,6 +114,7 @@ sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "m
 ```
 
 # Create extended selection tables
+
 ```{r}
 #| eval: false
 
@@ -167,6 +164,13 @@ saveRDS(tbp_calls, file = "./data/processed/extended_selection_table_tpb_calls.r
 ```
 
 # Measure acoustic features
+
+Four sets of acoustic features are measured: 
+    - Cross-correlation
+    - MFCCs
+    - Spectral features 
+    - Spectral + harmonic features
+    
 ```{r}
 #| eval: false
 
@@ -189,19 +193,25 @@ tbp_mfcc <- warbleR::mfcc_stats(
 # save results
 saveRDS(tbp_mfcc, file = "./data/processed/mfcc_tpb_calls.rds")
 
-# mfccs
+# spectral feautures
 tbp_spft <- warbleR::spectro_analysis(
   X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
 
-
 # save results
 saveRDS(tbp_spft, file = "./data/processed/spectral_features_tpb_calls.rds")
+
+tbp_spft_harm <- warbleR::spectro_analysis(
+  X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20, harmonicity = TRUE)
+
+# save results
+saveRDS(tbp_spft_harm, file = "./data/processed/spectral_features_harmonics_tpb_calls.rds")
+
 
 ```
 
 # Explore acoustic spaces
 
-Using cross-correlation:
+## Cross-correlation:
 ```{r}
 
 tbp_xc <- readRDS("./data/processed/cross_correlation_tpb_calls.rds")
@@ -221,7 +231,7 @@ ss_type <- space_similarity(type ~ MDS1 + MDS2, data = as.data.frame(tbp_calls),
 ggplot(tbp_calls, aes(x = MDS1, y = MDS2, color = type)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "MDS1", y = "MDS2") 
 
 ss_type_barks <- space_similarity(Site ~ MDS1 + MDS2, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
@@ -233,14 +243,14 @@ mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
 ggplot(tbp_calls, aes(x = MDS1, y = MDS2, color = Site)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   facet_grid(~ type, scales = "free") +
   labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "MDS1", y = "MDS2") 
 
     
 ```
 
-Using MFCCs:
+## MFCCs:
 ```{r}
 
 tbp_mfcc <- readRDS("./data/processed/mfcc_tpb_calls.rds")
@@ -258,7 +268,7 @@ ss_type <- space_similarity(type ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp
 ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = type)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
 
 
@@ -271,13 +281,13 @@ mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
 ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = Site)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   facet_grid(~ type, scales = "free") +
   labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
 
 ```
 
-Using spectral features:
+## Spectral features:
 ```{r}
 
 tbp_spft <- readRDS("./data/processed/spectral_features_tpb_calls.rds")
@@ -296,7 +306,7 @@ ss_type <- space_similarity(type ~ PC1.spft + PC2.spft, data = as.data.frame(tbp
 ggplot(tbp_calls, aes(x = PC1.spft, y = PC2.spft, color = type)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
 
 ss_type_barks <- space_similarity(Site ~ PC1.spft + PC2.spft, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
@@ -308,10 +318,51 @@ mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
 ggplot(tbp_calls, aes(x = PC1.spft, y = PC2.spft, color = Site)) +
   geom_point() +
   scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
-  theme_classic(base_size = 20) +
+  theme_classic(base_size = bs) +
   facet_grid(~ type, scales = "free") +
   labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
 ```
+
+## Spectral + harmonic features:
+```{r}
+
+tbp_spft_harm <- readRDS("./data/processed/spectral_features_harmonics_tpb_calls.rds")
+
+sub_tbp_calls <- tbp_calls[complete.cases(tbp_spft_harm), ]
+
+# remove NAs
+tbp_spft_harm <- tbp_spft_harm[complete.cases(tbp_spft_harm), ]
+# pca
+pca <- prcomp(tbp_spft_harm[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+sub_tbp_calls$PC1.spftharmft <- pca$x[, 1]
+sub_tbp_calls$PC2.spftharmft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(sub_tbp_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_barks <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls[sub_tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls[sub_tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+  
+ggplot(sub_tbp_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
 
 <!-- light green box -->
 
@@ -319,7 +370,7 @@ ggplot(tbp_calls, aes(x = PC1.spft, y = PC2.spft, color = Site)) +
 
 # Takeaways {.unnumbered .unlisted}
 
-- MFCCs seem to do a better job at capturing the acoustic variation in thick-billed parrots calls than cross-correlation and spectral features.
+- MFCCs seems to do a better job at capturing the acoustic variation in thick-billed parrots calls than cross-correlation and spectral features.
 
 ::: 
 
