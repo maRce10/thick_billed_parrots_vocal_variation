@@ -1,0 +1,442 @@
+---
+title: Vocal variation in yellow-naped amazons
+subtitle: Acoustic analysis
+author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a> 
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 4
+toc-location: left
+number-sections: true
+highlight-style: pygments
+knitr:
+  opts_chunk: 
+    warning: false
+format:
+  html:
+    df-print: kable
+    code-fold: true
+    code-tools: true
+    css: qmd.css
+    fig-height: 4
+    fig-format: png
+    fig-dpi: 200    
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r set root directory}
+#| eval: true
+#| echo: false
+
+# set working directory 
+knitr::opts_knit$set(root.dir =  "..")
+
+```
+
+```{r add link to github repo}
+#| eval: true
+#| output: asis
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style}
+#| message: false
+#| warning: false
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE
+ )
+
+# ggplot font size
+bs <- 12
+```
+
+
+<!-- skyblue box -->
+
+::: {.alert .alert-info}
+
+# Purpose {.unnumbered .unlisted}
+
+- Quantify contribution of different social levels of organization in the geographic variation of yellow-naped amazons calls.
+
+:::
+
+&nbsp; 
+
+
+<!-- light brown box -->
+::: {.alert .alert-warning}
+
+# Report overview {.unnumbered .unlisted}
+
+- You can have the sections listed here, for instance:
+
+  - [Measure acoustic features](#measure-acoustic-features)
+  - [Explore acoustic spaces](#explore-acoustic-spaces)
+
+:::
+
+
+# Analysis flowchart {.unnumbered .unlisted}
+```{mermaid}
+
+flowchart LR
+  A(Read data) --> B(Create extended<br>selection tables) 
+  B --> C(Measure acoustic<br>features)
+  C --> D(Explore acoustic spaces)
+
+style A fill:#44015466
+style B fill:#3E4A894D
+style C fill:#26828E4D
+style D fill:#6DCD594D
+
+```
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# knitr is require for creating html/pdf/word reports
+# formatR is used for soft-wrapping code
+
+# install/ load packages
+sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "maRce10/PhenotypeSpace"))
+
+```
+
+# Create extended selection tables
+
+```{r}
+#| eval: false
+
+# read 1994
+est_1994 <- warbleR::selection_table(path = "./data/raw/audio_files/yellow_naped_amazons/1994",
+                                      whole.recs = TRUE,
+                                      extended = TRUE)
+
+est_1994 <- resample_est(est_1994, samp.rate = 22.05)
+
+dat_1994 <- read.csv("./data/raw/audio_files/yellow_naped_amazons/1994/YNA1994_504Calls.csv")
+
+dat_1994$CallFile <- paste0(dat_1994$CallFile, ".wav_1")
+
+merged_1994 <- merge(est_1994, dat_1994, by.x = "sound.files", by.y = "CallFile", all.x = TRUE)
+
+merged_1994 <- fix_extended_selection_table(merged_1994, est_1994)
+
+merged_1994$type <- "1994"
+
+
+# read 2005
+est_2005 <- warbleR::selection_table(path = "./data/raw/audio_files/yellow_naped_amazons/2005",
+                                      whole.recs = TRUE,
+                                      extended = TRUE)
+
+
+dat_2005 <- read.csv("./data/raw/audio_files/yellow_naped_amazons/2005/YNA2005_1173Calls.csv")
+
+dat_2005$CallFile <- paste0(gsub("\\.aif", ".wav", dat_2005$CallFile), "_1")
+
+merged_2005 <- merge(est_2005, dat_2005, by.x = "sound.files", by.y = "CallFile", all.x = TRUE)
+
+merged_2005 <- fix_extended_selection_table(merged_2005, est_2005)
+
+merged_2005$type <- "2005"
+merged_1994 <- merged_1994[, names(merged_2005)]
+
+yna_calls <- rbind(merged_1994, merged_2005)
+yna_calls
+
+saveRDS(yna_calls, file = "./data/processed/extended_selection_table_yna_calls.rds")
+
+```
+
+# Measure acoustic features
+
+Four sets of acoustic features are measured: 
+    - Cross-correlation
+    - MFCCs
+    - Spectral features 
+    - Spectral + harmonic features
+    
+```{r}
+#| eval: false
+
+yna_calls <- readRDS("./data/processed/extended_selection_table_yna_calls.rds")
+
+# cross correlation
+yna_xc <- warbleR::cross_correlation(
+  X = yna_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+
+# save results
+saveRDS(yna_xc, file = "./data/processed/cross_correlation_yna_calls.rds")
+
+
+# mfccs
+yna_mfcc <- warbleR::mfcc_stats(
+  X = yna_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+
+# save results
+saveRDS(yna_mfcc, file = "./data/processed/mfcc_yna_calls.rds")
+
+# spectral feautures
+yna_spft <- warbleR::spectro_analysis(
+  X = yna_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+# save results
+saveRDS(yna_spft, file = "./data/processed/spectral_features_yna_calls.rds")
+
+# spectral + harmonic features
+yna_spft_harm <- warbleR::spectro_analysis(
+  X = yna_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20, harmonicity = TRUE)
+
+# save results
+saveRDS(yna_spft_harm, file = "./data/processed/spectral_features_harmonics_yna_calls.rds")
+
+yna_wpd <- warbleR::wpd_features(X = yna_calls, parallel = 20)
+
+# save results
+saveRDS(yna_wpd, file = "./data/processed/wavelets_yna_calls.rds")
+
+
+```
+
+# Explore acoustic spaces
+
+## Cross-correlation
+```{r}
+
+yna_xc <- readRDS("./data/processed/cross_correlation_yna_calls.rds")
+
+yna_calls <- readRDS("./data/processed/extended_selection_table_yna_calls.rds")
+
+yna_mds <- cmdscale(yna_xc, k = 2)
+
+yna_calls$MDS1 <- yna_mds[, 1]
+
+yna_calls$MDS2 <- yna_mds[, 2]
+
+
+ss_type <- space_similarity(type ~ MDS1 + MDS2, data = as.data.frame(yna_calls), method = "density.overlap")
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(yna_calls, aes(x = MDS1, y = MDS2, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Period") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "MDS1", y = "MDS2") 
+
+ss_type_2005 <- space_similarity(Site ~ MDS1 + MDS2, data = as.data.frame(yna_calls[yna_calls$type == "2005", ]), method = "density.overlap")
+ss_type_1994 <- space_similarity(Site ~ MDS1 + MDS2, data = as.data.frame(yna_calls[yna_calls$type == "1994", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_2005$mean.overlap, ss_type_1994$mean.overlap))
+
+ggplot(yna_calls, aes(x = MDS1, y = MDS2, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "MDS1", y = "MDS2") 
+
+    
+```
+
+## MFCCs
+```{r}
+
+yna_mfcc <- readRDS("./data/processed/mfcc_yna_calls.rds")
+
+# pca
+pca <- prcomp(yna_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+yna_calls$PC1.mfcc <- pca$x[, 1]
+yna_calls$PC2.mfcc <- pca$x[, 2]
+
+ss_type <- space_similarity(type ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(yna_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Period") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+
+ss_type_2005 <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls[yna_calls$type == "2005", ]), method = "density.overlap")
+ss_type_1994 <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls[yna_calls$type == "1994", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_2005$mean.overlap, ss_type_1994$mean.overlap))
+    
+ggplot(yna_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+## Spectral features
+```{r}
+
+yna_spft <- readRDS("./data/processed/spectral_features_yna_calls.rds")
+
+# pca
+pca <- prcomp(yna_spft[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+yna_calls$PC1.spft <- pca$x[, 1]
+yna_calls$PC2.spft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.spft + PC2.spft, data = as.data.frame(yna_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(yna_calls, aes(x = PC1.spft, y = PC2.spft, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Period") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_2005 <- space_similarity(Site ~ PC1.spft + PC2.spft, data = as.data.frame(yna_calls[yna_calls$type == "2005", ]), method = "density.overlap")
+ss_type_1994 <- space_similarity(Site ~ PC1.spft + PC2.spft, data = as.data.frame(yna_calls[yna_calls$type == "1994", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_2005$mean.overlap, ss_type_1994$mean.overlap))
+  
+ggplot(yna_calls, aes(x = PC1.spft, y = PC2.spft, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Spectral + harmonic features
+```{r}
+
+yna_spft_harm <- readRDS("./data/processed/spectral_features_harmonics_yna_calls.rds")
+
+sub_yna_calls <- yna_calls[complete.cases(yna_spft_harm), ]
+
+# remove NAs
+yna_spft_harm <- yna_spft_harm[complete.cases(yna_spft_harm), ]
+# pca
+pca <- prcomp(yna_spft_harm[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+sub_yna_calls$PC1.spftharmft <- pca$x[, 1]
+sub_yna_calls$PC2.spftharmft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_yna_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(sub_yna_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Period") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_2005 <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_yna_calls[sub_yna_calls$type == "2005", ]), method = "density.overlap")
+ss_type_1994 <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_yna_calls[sub_yna_calls$type == "1994", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_2005$mean.overlap, ss_type_1994$mean.overlap))
+  
+ggplot(sub_yna_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Wavelet features
+```{r}
+
+yna_wavelet <- readRDS("./data/processed/wavelets_yna_calls.rds")
+
+# pca
+pca <- prcomp(yna_wavelet[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+yna_calls$PC1.wpd <- pca$x[, 1]
+yna_calls$PC2.wpd <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.wpd + PC2.wpd, data = as.data.frame(yna_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(yna_calls, aes(x = PC1.wpd, y = PC2.wpd, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Period") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_2005 <- space_similarity(Site ~ PC1.wpd + PC2.wpd, data = as.data.frame(yna_calls[yna_calls$type == "2005", ]), method = "density.overlap")
+ss_type_1994 <- space_similarity(Site ~ PC1.wpd + PC2.wpd, data = as.data.frame(yna_calls[yna_calls$type == "1994", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_2005$mean.overlap, ss_type_1994$mean.overlap))
+  
+ggplot(yna_calls, aes(x = PC1.wpd, y = PC2.wpd, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+
+<!-- light green box -->
+
+::: {.alert .alert-success}
+
+# Takeaways {.unnumbered .unlisted}
+
+- MFCCs seems to do a better job at capturing the acoustic variation in thick-billed parrots calls.
+
+::: 
+
+&nbsp;
+
+<!-- '---' adds a gray vertical line -->
+
+---
+
+&nbsp; 
+ 
+ <!-- add packages used, system details and versions  -->
+ 
+# Session information {.unnumbered .unlisted}
+
+```{r session info}
+#| echo: false
+
+# if devtools is installed use devtools::session_info()
+if (requireNamespace("devtools", quietly = TRUE)) {
+  devtools::session_info()
+} else {
+  sessionInfo()
+}
+
+```

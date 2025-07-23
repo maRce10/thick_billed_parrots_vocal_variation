@@ -1,0 +1,442 @@
+---
+title: Vocal variation in thick-billed parrots
+subtitle: Acoustic analysis
+author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a> 
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 4
+toc-location: left
+number-sections: true
+highlight-style: pygments
+format:
+  html:
+    df-print: kable
+    code-fold: true
+    code-tools: true
+    css: qmd.css
+    fig-height: 4
+    fig-format: png
+    fig-dpi: 200    
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r set root directory}
+#| eval: true
+#| echo: false
+
+# set working directory 
+knitr::opts_knit$set(root.dir =  "..")
+
+```
+
+```{r add link to github repo}
+#| eval: true
+#| output: asis
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style}
+#| message: false
+#| warning: false
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE
+ )
+
+# ggplot font size
+bs <- 12
+```
+
+
+<!-- skyblue box -->
+
+::: {.alert .alert-info}
+
+# Purpose {.unnumbered .unlisted}
+
+- Quantify contribution of different social levels of organization in the geographic variation of thick-billed parrots calls.
+
+:::
+
+&nbsp; 
+
+
+<!-- light brown box -->
+::: {.alert .alert-warning}
+
+# Report overview {.unnumbered .unlisted}
+
+- You can have the sections listed here, for instance:
+
+  - [Measure acoustic features](#measure-acoustic-features)
+  - [Explore acoustic spaces](#explore-acoustic-spaces)
+
+:::
+
+
+# Analysis flowchart {.unnumbered .unlisted}
+```{mermaid}
+
+flowchart LR
+  A(Read data) --> B(Create extended<br>selection tables) 
+  B --> C(Measure acoustic<br>features)
+  C --> D(Explore acoustic spaces)
+
+style A fill:#44015466
+style B fill:#3E4A894D
+style C fill:#26828E4D
+style D fill:#6DCD594D
+
+```
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# knitr is require for creating html/pdf/word reports
+# formatR is used for soft-wrapping code
+
+# install/ load packages
+sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "maRce10/PhenotypeSpace"))
+
+```
+
+# Create extended selection tables
+
+```{r}
+#| eval: false
+
+# read laughs
+est_laughs <- warbleR::selection_table(path = "./data/raw/audio_files/thick_billed_parrots/laughs/",
+                                      whole.recs = TRUE,
+                                      extended = TRUE)
+
+est_laughs <- resample_est(est_laughs, samp.rate = 22.05)
+
+dat_laughs <- read.csv("./data/raw/audio_files/thick_billed_parrots/laughs/TBP_Laugh1stNote-CallList_20Jul25.csv")
+
+dat_laughs$CallFile <- paste0(gsub("\\.aif", "", dat_laughs$CallFile), "_1")
+
+merged_laughs <- merge(est_laughs, dat_laughs, by.x = "sound.files", by.y = "CallFile", all.x = TRUE)
+
+merged_laughs <- fix_extended_selection_table(merged_laughs, est_laughs)
+
+merged_laughs$type <- "laughs"
+
+
+# read barks
+est_barks <- warbleR::selection_table(path = "./data/raw/audio_files/thick_billed_parrots/barks",
+                                      whole.recs = TRUE,
+                                      extended = TRUE)
+
+est_barks <- resample_est(est_barks, samp.rate = 22.05)
+
+dat_barks <- read.csv("./data/raw/audio_files/thick_billed_parrots/barks/TBP_Bark-CallList_20Jul25.csv")
+
+dat_barks <- dat_barks[(dat_barks$Call.File) != "", ]
+
+names(dat_barks) <- names(dat_laughs)
+
+dat_barks$CallFile <- paste0(gsub("\\.aif", ".wav", dat_barks$CallFile), "_1")
+
+merged_barks <- merge(est_barks, dat_barks, by.x = "sound.files", by.y = "CallFile", all.x = TRUE)
+
+merged_barks <- fix_extended_selection_table(merged_barks, est_barks)
+
+merged_barks$type <- "barks"
+
+tbp_calls <- rbind(merged_laughs, merged_barks)
+
+saveRDS(tbp_calls, file = "./data/processed/extended_selection_table_tpb_calls.rds")
+
+```
+
+# Measure acoustic features
+
+Four sets of acoustic features are measured: 
+    - Cross-correlation
+    - MFCCs
+    - Spectral features 
+    - Spectral + harmonic features
+    
+```{r}
+#| eval: false
+
+tbp_calls <- readRDS("./data/processed/extended_selection_table_tpb_calls.rds")
+
+# cross correlation
+tbp_xc <- warbleR::cross_correlation(
+  X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+
+# save results
+saveRDS(tbp_xc, file = "./data/processed/cross_correlation_tpb_calls.rds")
+
+
+# mfccs
+tbp_mfcc <- warbleR::mfcc_stats(
+  X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+
+# save results
+saveRDS(tbp_mfcc, file = "./data/processed/mfcc_tpb_calls.rds")
+
+# spectral feautures
+tbp_spft <- warbleR::spectro_analysis(
+  X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+# save results
+saveRDS(tbp_spft, file = "./data/processed/spectral_features_tpb_calls.rds")
+
+# spectral + harmonic features
+tbp_spft_harm <- warbleR::spectro_analysis(
+  X = tbp_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20, harmonicity = TRUE)
+
+# save results
+saveRDS(tbp_spft_harm, file = "./data/processed/spectral_features_harmonics_tpb_calls.rds")
+
+tbp_wpd <- warbleR::wpd_features(X = tbp_calls, parallel = 20)
+
+# save results
+saveRDS(tbp_wpd, file = "./data/processed/wavelets_tpb_calls.rds")
+
+
+```
+
+# Explore acoustic spaces
+
+## Cross-correlation
+```{r}
+
+tbp_xc <- readRDS("./data/processed/cross_correlation_tpb_calls.rds")
+
+tbp_calls <- readRDS("./data/processed/extended_selection_table_tpb_calls.rds")
+
+tbp_mds <- cmdscale(tbp_xc, k = 2)
+
+tbp_calls$MDS1 <- tbp_mds[, 1]
+
+tbp_calls$MDS2 <- tbp_mds[, 2]
+
+
+ss_type <- space_similarity(type ~ MDS1 + MDS2, data = as.data.frame(tbp_calls), method = "density.overlap")
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(tbp_calls, aes(x = MDS1, y = MDS2, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "MDS1", y = "MDS2") 
+
+ss_type_barks <- space_similarity(Site ~ MDS1 + MDS2, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ MDS1 + MDS2, data = as.data.frame(tbp_calls[tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+
+ggplot(tbp_calls, aes(x = MDS1, y = MDS2, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "MDS1", y = "MDS2") 
+
+    
+```
+
+## MFCCs
+```{r}
+
+tbp_mfcc <- readRDS("./data/processed/mfcc_tpb_calls.rds")
+
+# pca
+pca <- prcomp(tbp_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+tbp_calls$PC1.mfcc <- pca$x[, 1]
+tbp_calls$PC2.mfcc <- pca$x[, 2]
+
+ss_type <- space_similarity(type ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+
+ss_type_barks <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls[tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+    
+ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+## Spectral features
+```{r}
+
+tbp_spft <- readRDS("./data/processed/spectral_features_tpb_calls.rds")
+
+# pca
+pca <- prcomp(tbp_spft[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+tbp_calls$PC1.spft <- pca$x[, 1]
+tbp_calls$PC2.spft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.spft + PC2.spft, data = as.data.frame(tbp_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(tbp_calls, aes(x = PC1.spft, y = PC2.spft, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_barks <- space_similarity(Site ~ PC1.spft + PC2.spft, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ PC1.spft + PC2.spft, data = as.data.frame(tbp_calls[tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+  
+ggplot(tbp_calls, aes(x = PC1.spft, y = PC2.spft, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Spectral + harmonic features
+```{r}
+
+tbp_spft_harm <- readRDS("./data/processed/spectral_features_harmonics_tpb_calls.rds")
+
+sub_tbp_calls <- tbp_calls[complete.cases(tbp_spft_harm), ]
+
+# remove NAs
+tbp_spft_harm <- tbp_spft_harm[complete.cases(tbp_spft_harm), ]
+# pca
+pca <- prcomp(tbp_spft_harm[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+sub_tbp_calls$PC1.spftharmft <- pca$x[, 1]
+sub_tbp_calls$PC2.spftharmft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(sub_tbp_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_barks <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls[sub_tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_tbp_calls[sub_tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+  
+ggplot(sub_tbp_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Wavelet features
+```{r}
+
+tbp_wavelet <- readRDS("./data/processed/wavelets_tpb_calls.rds")
+
+# pca
+pca <- prcomp(tbp_wavelet[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+tbp_calls$PC1.wpd <- pca$x[, 1]
+tbp_calls$PC2.wpd <- pca$x[, 2]
+
+
+ss_type <- space_similarity(type ~ PC1.wpd + PC2.wpd, data = as.data.frame(tbp_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(tbp_calls, aes(x = PC1.wpd, y = PC2.wpd, color = type)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_barks <- space_similarity(Site ~ PC1.wpd + PC2.wpd, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
+ss_type_laughs <- space_similarity(Site ~ PC1.wpd + PC2.wpd, data = as.data.frame(tbp_calls[tbp_calls$type == "laughs", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
+  
+ggplot(tbp_calls, aes(x = PC1.wpd, y = PC2.wpd, color = Site)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ type, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+
+<!-- light green box -->
+
+::: {.alert .alert-success}
+
+# Takeaways {.unnumbered .unlisted}
+
+- MFCCs seems to do a better job at capturing the acoustic variation in thick-billed parrots calls.
+
+::: 
+
+&nbsp;
+
+<!-- '---' adds a gray vertical line -->
+
+---
+
+&nbsp; 
+ 
+ <!-- add packages used, system details and versions  -->
+ 
+# Session information {.unnumbered .unlisted}
+
+```{r session info}
+#| echo: false
+
+# if devtools is installed use devtools::session_info()
+if (requireNamespace("devtools", quietly = TRUE)) {
+  devtools::session_info()
+} else {
+  sessionInfo()
+}
+
+```
