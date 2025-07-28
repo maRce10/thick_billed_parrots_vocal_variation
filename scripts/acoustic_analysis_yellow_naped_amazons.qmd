@@ -81,7 +81,7 @@ bs <- 12
 
 # Report overview {.unnumbered .unlisted}
 
-- You can have the sections listed here, for instance:
+- Sections:
 
   - [Measure acoustic features](#measure-acoustic-features)
   - [Explore acoustic spaces](#explore-acoustic-spaces)
@@ -128,6 +128,7 @@ est_1994 <- warbleR::selection_table(path = "./data/raw/audio_files/yellow_naped
 
 est_1994 <- resample_est(est_1994, samp.rate = 22.05)
 
+
 dat_1994 <- read.csv("./data/raw/audio_files/yellow_naped_amazons/1994/YNA1994_504Calls.csv")
 
 dat_1994$CallFile <- paste0(dat_1994$CallFile, ".wav_1")
@@ -153,6 +154,14 @@ merged_2005 <- merge(est_2005, dat_2005, by.x = "sound.files", by.y = "CallFile"
 
 merged_2005 <- fix_extended_selection_table(merged_2005, est_2005)
 
+merged_2005$Site[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <- "PEAL"
+merged_2005$Dialect[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <- "Nor"
+merged_2005$Year[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <- 2005
+
+# get individual from name
+sf <- merged_2005$sound.files[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")]
+merged_2005$UniqueBird[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <- paste(sapply(strsplit(sf, "_"), "[[", 4), sapply(strsplit(sf, "_"), "[[", 5), sep = "-")
+
 merged_2005$type <- "2005"
 merged_1994 <- merged_1994[, names(merged_2005)]
 
@@ -165,11 +174,12 @@ saveRDS(yna_calls, file = "./data/processed/extended_selection_table_yna_calls.r
 
 # Measure acoustic features
 
-Four sets of acoustic features are measured: 
+Five sets of acoustic features are measured: 
     - Cross-correlation
     - MFCCs
     - Spectral features 
     - Spectral + harmonic features
+    - Wavelet features
     
 ```{r}
 #| eval: false

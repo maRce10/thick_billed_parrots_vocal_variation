@@ -78,7 +78,7 @@ bs <- 12
 
 # Report overview {.unnumbered .unlisted}
 
-- You can have the sections listed here, for instance:
+- Sections:
 
   - [Measure acoustic features](#measure-acoustic-features)
   - [Explore acoustic spaces](#explore-acoustic-spaces)
@@ -109,7 +109,7 @@ style D fill:#6DCD594D
 # formatR is used for soft-wrapping code
 
 # install/ load packages
-sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "maRce10/PhenotypeSpace"))
+sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "maRce10/PhenotypeSpace", "lme4"))
 
 ```
 
@@ -165,11 +165,12 @@ saveRDS(tbp_calls, file = "./data/processed/extended_selection_table_tpb_calls.r
 
 # Measure acoustic features
 
-Four sets of acoustic features are measured: 
+Five sets of acoustic features are measured: 
     - Cross-correlation
     - MFCCs
     - Spectral features 
     - Spectral + harmonic features
+    - Wavelet features
     
 ```{r}
 #| eval: false
@@ -403,6 +404,46 @@ ggplot(tbp_calls, aes(x = PC1.wpd, y = PC2.wpd, color = Site)) +
   theme_classic(base_size = bs) +
   facet_grid(~ type, scales = "free") +
   labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+
+# Partition contribution to variance of different social levels of organization {.unnumbered .unlisted}
+
+
+```{r}
+#| eval: false
+
+model_indiv <- lmer(contour.sim ~ (1 | lek / lek.song.type / bird.id) + (1 | year), data = sub_sp_lbh)
+
+var_components_indiv <- part_var(model_indiv)
+
+var_components_indiv$level <- factor(c("Individual", "Song type",  "Lek",  "Year", "Residual"), levels = c("Individual", "Song type", "Lek", "Year", "Residual"))
+
+# sample sizes
+var_components_indiv$n <- sapply(c("bird.id", "lek.song.type","lek",  "year", "Residual"), function(x) length(unique(sub_sp_lbh[,  names(sub_sp_lbh) == x])))
+
+
+var_components_indiv$prop <- as.character(round(var_components_indiv$proportion, 2))
+
+var_components_indiv$prop[var_components_indiv$prop == "0"] <- "< 0.01"
+
+var_components_indiv$prop <- paste(var_components_indiv$prop, " (n = ", var_components_indiv$n, ")", sep = "")
+
+# barplot of variance by factor
+# ggplot(var_components_indiv[var_components_indiv$level != "Residual", ], aes(x = level, y = proportion, fill = grp)) +
+#     geom_bar(stat = "identity") + theme_classic(base_size = 14) + labs(x = "Level", y = "Explained variance", fill = "Factor") +
+#     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+#     geom_text(aes(label = prop), vjust = -0.5, size = 3) +
+#     scale_fill_viridis_d(option = "G", begin = 0.1, end = 0.9, guide = "none")
+
+var_components_contour <- rbind(var_components_indiv, var_components_site[var_components_site$grp == "site", ])
+
+var_components_contour$level <- factor(c("Individual", "Song type",  "Lek",  "Year", "Residual", "Site"), levels = c("Individual", "Song type", "Lek", "Year", "Residual", "Site"))
+
+var_components_contour$proportion <- var_components_contour$proportion / sum(var_components_contour$proportion) 
+
+var_components_contour$prop <- paste(round(var_components_contour$proportion, 2), " (n = ", var_components_contour$n, ")", sep = "")
 
 ```
 

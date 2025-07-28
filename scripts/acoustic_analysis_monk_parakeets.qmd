@@ -1,0 +1,396 @@
+---
+title: Vocal variation in monk parakeets
+subtitle: Acoustic analysis
+author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a> 
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 4
+toc-location: left
+number-sections: true
+highlight-style: pygments
+knitr:
+  opts_chunk: 
+    warning: false
+format:
+  html:
+    df-print: kable
+    code-fold: true
+    code-tools: true
+    css: qmd.css
+    fig-height: 4
+    fig-format: png
+    fig-dpi: 200    
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r set root directory}
+#| eval: true
+#| echo: false
+
+# set working directory 
+knitr::opts_knit$set(root.dir =  "..")
+
+```
+
+```{r add link to github repo}
+#| eval: true
+#| output: asis
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style}
+#| message: false
+#| warning: false
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE
+ )
+
+# ggplot font size
+bs <- 12
+```
+
+
+<!-- skyblue box -->
+
+::: {.alert .alert-info}
+
+# Purpose {.unnumbered .unlisted}
+
+- Quantify contribution of different social levels of organization in the geographic variation of monk parakeets calls.
+
+:::
+
+&nbsp; 
+
+
+<!-- light brown box -->
+::: {.alert .alert-warning}
+
+# Report overview {.unnumbered .unlisted}
+
+- Sections:
+
+  - [Measure acoustic features](#measure-acoustic-features)
+  - [Explore acoustic spaces](#explore-acoustic-spaces)
+
+:::
+
+
+# Analysis flowchart {.unnumbered .unlisted}
+```{mermaid}
+
+flowchart LR
+  A(Read data) --> B(Measure acoustic<br>features)
+  B --> C(Explore acoustic spaces)
+
+style A fill:#44015466
+style B fill:#3E4A894D
+style C fill:#26828E4D
+
+```
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# knitr is require for creating html/pdf/word reports
+# formatR is used for soft-wrapping code
+
+# install/ load packages
+sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "maRce10/PhenotypeSpace"))
+
+```
+
+# Measure acoustic features
+
+Five sets of acoustic features are measured: 
+    - Cross-correlation
+    - MFCCs
+    - Spectral features 
+    - Spectral + harmonic features
+    - Wavelet features
+    
+```{r}
+#| eval: false
+
+mpa_calls <- readRDS("./data/processed/monk_parakeet_contactCalls_rangeComparison_extSelTable.RDS")
+
+# cross correlation
+mpa_xc <- warbleR::cross_correlation(
+  X = mpa_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+color = type
+
+# save results
+saveRDS(mpa_xc, file = "./data/processed/cross_correlation_mpa_calls.rds")
+
+
+# mfccs
+mpa_mfcc <- warbleR::mfcc_stats(
+  X = mpa_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+
+# save results
+saveRDS(mpa_mfcc, file = "./data/processed/mfcc_mpa_calls.rds")
+
+# spectral feautures
+mpa_spft <- warbleR::spectro_analysis(
+  X = mpa_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20)
+
+# save results
+saveRDS(mpa_spft, file = "./data/processed/spectral_features_mpa_calls.rds")
+
+# spectral + harmonic features
+mpa_spft_harm <- warbleR::spectro_analysis(
+  X = mpa_calls, ovlp = 70, bp = c(0.1, 8), parallel = 20, harmonicity = TRUE)
+
+# save results
+saveRDS(mpa_spft_harm, file = "./data/processed/spectral_features_harmonics_mpa_calls.rds")
+
+mpa_wpd <- warbleR::wpd_features(X = mpa_calls, parallel = 20)
+
+# save results
+saveRDS(mpa_wpd, file = "./data/processed/wavelets_mpa_calls.rds")
+
+
+```
+
+# Explore acoustic spaces
+
+## Cross-correlation
+```{r}
+
+mpa_xc <- readRDS("./data/processed/cross_correlation_mpa_calls.rds")
+
+mpa_calls <- readRDS("./data/processed/monk_parakeet_contactCalls_rangeComparison_extSelTable.RDS")
+
+mpa_calls$country.region <- paste(mpa_calls$country, mpa_calls$region, sep = "-")
+
+mpa_mds <- cmdscale(mpa_xc, k = 2)
+
+mpa_calls$MDS1 <- mpa_mds[, 1]
+
+mpa_calls$MDS2 <- mpa_mds[, 2]
+
+
+ss_type <- space_similarity(country ~ MDS1 + MDS2, data = as.data.frame(mpa_calls), method = "density.overlap")
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(mpa_calls, aes(x = MDS1, y = MDS2, color = country)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "MDS1", y = "MDS2") 
+
+
+ss_type_us <- space_similarity(country.region ~ MDS1 + MDS2, data = as.data.frame(mpa_calls[mpa_calls$country == "United States", ]), method = "density.overlap")
+ss_type_Uruguay <- space_similarity(country.region ~ MDS1 + MDS2, data = as.data.frame(mpa_calls[mpa_calls$country == "Uruguay", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
+
+ggplot(mpa_calls, aes(x = MDS1, y = MDS2, color = country.region)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ country, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "MDS1", y = "MDS2") 
+
+```
+
+## MFCCs
+```{r}
+
+mpa_mfcc <- readRDS("./data/processed/mfcc_mpa_calls.rds")
+
+# pca
+pca <- prcomp(mpa_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+mpa_calls$PC1.mfcc <- pca$x[, 1]
+mpa_calls$PC2.mfcc <- pca$x[, 2]
+
+ss_type <- space_similarity(country ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(mpa_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = country)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+
+ss_type_us <- space_similarity(country.region ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls[mpa_calls$country == "United States", ]), method = "density.overlap")
+ss_type_Uruguay <- space_similarity(country.region ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls[mpa_calls$country == "Uruguay", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
+    
+ggplot(mpa_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = country.region)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ country, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+## Spectral features
+```{r}
+
+mpa_spft <- readRDS("./data/processed/spectral_features_mpa_calls.rds")
+
+# pca
+pca <- prcomp(mpa_spft[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+mpa_calls$PC1.spft <- pca$x[, 1]
+mpa_calls$PC2.spft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(country ~ PC1.spft + PC2.spft, data = as.data.frame(mpa_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(mpa_calls, aes(x = PC1.spft, y = PC2.spft, color = country)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_us <- space_similarity(country.region ~ PC1.spft + PC2.spft, data = as.data.frame(mpa_calls[mpa_calls$country == "United States", ]), method = "density.overlap")
+ss_type_Uruguay <- space_similarity(country.region ~ PC1.spft + PC2.spft, data = as.data.frame(mpa_calls[mpa_calls$country == "Uruguay", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
+  
+ggplot(mpa_calls, aes(x = PC1.spft, y = PC2.spft, color = country.region)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ country, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Spectral + harmonic features
+```{r}
+
+mpa_spft_harm <- readRDS("./data/processed/spectral_features_harmonics_mpa_calls.rds")
+
+sub_mpa_calls <- mpa_calls[complete.cases(mpa_spft_harm), ]
+
+# remove NAs
+mpa_spft_harm <- mpa_spft_harm[complete.cases(mpa_spft_harm), ]
+# pca
+pca <- prcomp(mpa_spft_harm[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+sub_mpa_calls$PC1.spftharmft <- pca$x[, 1]
+sub_mpa_calls$PC2.spftharmft <- pca$x[, 2]
+
+
+ss_type <- space_similarity(country ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_mpa_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(sub_mpa_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = country)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_us <- space_similarity(country.region ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_mpa_calls[sub_mpa_calls$country == "United States", ]), method = "density.overlap")
+ss_type_Uruguay <- space_similarity(country.region ~ PC1.spftharmft + PC2.spftharmft, data = as.data.frame(sub_mpa_calls[sub_mpa_calls$country == "Uruguay", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
+  
+ggplot(sub_mpa_calls, aes(x = PC1.spftharmft, y = PC2.spftharmft, color = country.region)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ country, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2")   
+```
+
+## Wavelet features
+```{r}
+
+mpa_wavelet <- readRDS("./data/processed/wavelets_mpa_calls.rds")
+
+# pca
+pca <- prcomp(mpa_wavelet[, -c(1:2)], center = TRUE, scale. = TRUE)
+
+mpa_calls$PC1.wpd <- pca$x[, 1]
+mpa_calls$PC2.wpd <- pca$x[, 2]
+
+
+ss_type <- space_similarity(country ~ PC1.wpd + PC2.wpd, data = as.data.frame(mpa_calls), method = "density.overlap")
+
+
+# graph bidimensional space with gpplot coloring by type
+ggplot(mpa_calls, aes(x = PC1.wpd, y = PC2.wpd, color = country)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
+  theme_classic(base_size = bs) +
+  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
+
+ss_type_us <- space_similarity(country.region ~ PC1.wpd + PC2.wpd, data = as.data.frame(mpa_calls[mpa_calls$country == "United States", ]), method = "density.overlap")
+ss_type_Uruguay <- space_similarity(country.region ~ PC1.wpd + PC2.wpd, data = as.data.frame(mpa_calls[mpa_calls$country == "Uruguay", ]), method = "density.overlap")
+
+
+mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
+  
+ggplot(mpa_calls, aes(x = PC1.wpd, y = PC2.wpd, color = country.region)) +
+  geom_point() +
+  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
+  theme_classic(base_size = bs) +
+  facet_grid(~ country, scales = "free") +
+  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
+
+```
+
+
+<!-- light green box -->
+
+::: {.alert .alert-success}
+
+# Takeaways {.unnumbered .unlisted}
+
+- MFCCs seems to do a better job at capturing the acoustic variation in thick-billed parrots calls.
+
+::: 
+
+&nbsp;
+
+<!-- '---' adds a gray vertical line -->
+
+---
+
+&nbsp; 
+ 
+ <!-- add packages used, system details and versions  -->
+ 
+# Session information {.unnumbered .unlisted}
+
+```{r session info}
+#| echo: false
+
+# if devtools is installed use devtools::session_info()
+if (requireNamespace("devtools", quietly = TRUE)) {
+  devtools::session_info()
+} else {
+  sessionInfo()
+}
+
+```
