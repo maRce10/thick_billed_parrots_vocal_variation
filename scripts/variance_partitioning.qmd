@@ -1,6 +1,6 @@
 ---
 title: Partitioning variation of call structure at social scales in parrots
-subtitle: Acoustic analysis
+subtitle: Statistical analysis
 author: <a href="https://marce10.github.io/">Marcelo Araya-Salas</a> 
 date: "`r Sys.Date()`"
 toc: true
@@ -94,6 +94,13 @@ graph_part_var <- function(levels,
     } else
         by_levels <- "full"
     
+    # scale response
+    if (is.numeric(data[, response])) {
+        data[, response] <- scale(data[, response])
+    } else {
+        stop("Response variable must be numeric")
+    }
+    
     var_by_list <- lapply(by_levels, function(x) {
         if (x != "full") {
             formula <- paste0(response, " ~ (1 | ", paste(levels, collapse = " / "), ")")
@@ -114,7 +121,8 @@ graph_part_var <- function(levels,
 
         }
         
-        model <- lmer(formula, data = dat)
+        model <- lmer(formula, data = dat, control = lmerControl(optimizer = "bobyqa", 
+                                 optCtrl = list(maxfun = 2e5)))
         var_components <- part_var(model)
         var_components <- var_components[var_components$grp != "Residual", ]
         
@@ -124,7 +132,7 @@ graph_part_var <- function(levels,
         var_components$level <- factor(rev(levels), levels = rev(levels))
         
         # sample sizes
-        var_components$n <- sapply(levels, function(y)
+        var_components$n <- sapply(var_components$level, function(y)
             length(unique(dat[, names(dat) == y])))
         
         var_components$prop <- as.character(round(var_components$proportion, 2))
@@ -262,35 +270,13 @@ sketchy::load_packages(packages = c("knitr", "formatR", "warbleR", "ggplot2", "m
 
 # Thick-billed parrots
 
-## MFCCs acoustic space by call type
+## MFCCs
 ```{r}
 tbp_calls <- readRDS("./data/processed/extended_selection_table_tpb_calls.rds")
 tbp_mfcc <- readRDS("./data/processed/mfcc_tpb_calls.rds")
 
 datatable(tbp_calls)
 
-# pca
-pca <- prcomp(tbp_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
-
-tbp_calls$PC1.mfcc <- pca$x[, 1]
-tbp_calls$PC2.mfcc <- pca$x[, 2]
-
-ss_type <- space_similarity(type ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls), method = "density.overlap")
-
-
-# graph bidimensional space with gpplot coloring by type
-ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = type)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
-  theme_classic(base_size = bs) +
-  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2")
-
-```
-
-## MFCCs acoustic space by site for each call type
-
-PCA is computed separately for each call type
-```{r}
 
 tbp_calls$PC1.mfcc <- NA
 tbp_calls$PC2.mfcc <- NA
@@ -304,18 +290,6 @@ tbp_calls$PC2.mfcc[tbp_calls$type == i] <- pca$x[, 2]
 # tbp_calls$PC1.mfcc[tbp_calls$type == i] <- umap_l$layout[, 1]
 # tbp_calls$PC2.mfcc[tbp_calls$type == i] <- umap_l$layout[, 2]
 }
-
-ss_type_barks <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls[tbp_calls$type == "barks", ]), method = "density.overlap")
-ss_type_laughs <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(tbp_calls[tbp_calls$type == "laughs", ]), method = "density.overlap")
-
-mean_ovlp <- mean(c(ss_type_barks$mean.overlap, ss_type_laughs$mean.overlap))
-    
-ggplot(tbp_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = Site)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
-  theme_classic(base_size = bs) +
-  facet_grid(~ type, scales = "free") +
-  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
 
 ```
 
@@ -333,37 +307,57 @@ graph_part_var(levels = c("Site", "UniqueBird"), data = as.data.frame(tbp_calls)
 ```
 
 
+```{r}
+#| eval: false
+#| echo: false
+
+## Cross-correlation
+tbp_calls <- readRDS("./data/processed/extended_selection_table_tpb_calls.rds")
+tbp_xc <- readRDS("./data/processed/cross_correlation_tpb_calls.rds")
+
+mds <- cmdscale(tbp_xc, k = 1)
+tbp_calls$mds1.xc <- mds[, 1]
+
+# tbp_calls$mds1.xc <- NA
+# tbp_calls$mds2.xc <- NA
+# 
+# for (i in unique(tbp_calls$type)){
+# mds <- cmdscale(tbp_xc[tbp_calls$type == i, tbp_calls$type == i], k = 1)
+# tbp_calls$mds1.xc[tbp_calls$type == i] <- mds[, 1]
+# }
+
+```
+
+
+```{r}
+#| eval: false
+#| echo: false
+#| fig-height: 8
+
+## Partition variance contribution
+
+graph_part_var(levels = c("Site", "UniqueBird"), data = as.data.frame(tbp_calls), by = "type", response = "mds1.xc", full = FALSE)
+
+
+```
+
+
+
 # Yellow-naped amazons
 
-## MFCCs acoustic space by call type
+## MFCCs
 ```{r}
 yna_mfcc <- readRDS("./data/processed/mfcc_yna_calls.rds")
 yna_calls <- readRDS("./data/processed/extended_selection_table_yna_calls.rds")
 
 datatable(yna_calls)
 
-# pca
-pca <- prcomp(yna_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+# # pca
+# pca <- prcomp(yna_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+# 
+# yna_calls$PC1.mfcc <- pca$x[, 1]
+# yna_calls$PC2.mfcc <- pca$x[, 2]
 
-yna_calls$PC1.mfcc <- pca$x[, 1]
-yna_calls$PC2.mfcc <- pca$x[, 2]
-
-ss_type <- space_similarity(type ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls), method = "density.overlap")
-
-
-# graph bidimensional space with gpplot coloring by type
-ggplot(yna_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = type)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Call type") +
-  theme_classic(base_size = bs) +
-  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2")
-
-```
-
-## MFCCs acoustic space by site for each call type
-
-PCA is computed separately for each call type
-```{r}
 
 yna_calls$PC1.mfcc <- NA
 yna_calls$PC2.mfcc <- NA
@@ -380,17 +374,6 @@ yna_calls$PC2.mfcc[yna_calls$type == i] <- pca$x[, 2]
 
 yna_calls <- yna_calls[!is.na(yna_calls$Site), ]
 
-ss_type_1994 <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls[yna_calls$type == "1994", ]), method = "density.overlap")
-ss_type_2005 <- space_similarity(Site ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(yna_calls[yna_calls$type == "2005", ]), method = "density.overlap")
-
-mean_ovlp <- mean(c(ss_type_1994$mean.overlap, ss_type_2005$mean.overlap))
-    
-ggplot(yna_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = Site)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Site") +
-  theme_classic(base_size = bs) +
-  facet_grid(~ type, scales = "free") +
-  labs(title = paste0("Mean density overlap:", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
 
 ```
 
@@ -419,27 +402,11 @@ datatable(mpa_calls)
 mpa_calls$country.region <- paste(mpa_calls$country, mpa_calls$region, sep = "-")
 
 # pca
-pca <- prcomp(mpa_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+# pca <- prcomp(mpa_mfcc[, -c(1:2)], center = TRUE, scale. = TRUE)
+# 
+# mpa_calls$PC1.mfcc <- pca$x[, 1]
+# mpa_calls$PC2.mfcc <- pca$x[, 2]
 
-mpa_calls$PC1.mfcc <- pca$x[, 1]
-mpa_calls$PC2.mfcc <- pca$x[, 2]
-
-ss_type <- space_similarity(country ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls), method = "density.overlap")
-
-
-# graph bidimensional space with gpplot coloring by type
-ggplot(mpa_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = country)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "Country") +
-  theme_classic(base_size = bs) +
-  labs(title = paste0("Mean density overlap:", round(ss_type$mean.overlap, 2)), x = "PC1", y = "PC2") 
-
-```
-
-## MFCCs acoustic space by site for each call type
-
-PCA is computed separately for each call type
-```{r}
 
 mpa_calls$PC1.mfcc <- NA
 mpa_calls$PC2.mfcc <- NA
@@ -453,19 +420,6 @@ mpa_calls$PC2.mfcc[mpa_calls$country == i] <- pca$x[, 2]
 # mpa_calls$PC1.mfcc[mpa_calls$type == i] <- umap_l$layout[, 1]
 # mpa_calls$PC2.mfcc[mpa_calls$type == i] <- umap_l$layout[, 2]
 }
-
-ss_type_us <- space_similarity(country.region ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls[mpa_calls$country == "United States", ]), method = "density.overlap")
-ss_type_Uruguay <- space_similarity(country.region ~ PC1.mfcc + PC2.mfcc, data = as.data.frame(mpa_calls[mpa_calls$country == "Uruguay", ]), method = "density.overlap")
-
-
-mean_ovlp <- mean(c(ss_type_us$mean.overlap, ss_type_Uruguay$mean.overlap))
-    
-ggplot(mpa_calls, aes(x = PC1.mfcc, y = PC2.mfcc, color = country.region)) +
-  geom_point() +
-  scale_colour_viridis_d(option = "G", begin = 0.2, end = 0.8, name = "country.region") +
-  theme_classic(base_size = bs) +
-  facet_grid(~ country, scales = "free") +
-  labs(title = paste0("Mean density overlap: ", round(mean_ovlp, 2)), x = "PC1", y = "PC2") 
 
 ```
 
