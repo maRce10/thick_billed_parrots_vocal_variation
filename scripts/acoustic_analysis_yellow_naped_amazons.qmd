@@ -129,7 +129,7 @@ est_1994 <- warbleR::selection_table(path = "./data/raw/audio_files/yellow_naped
 est_1994 <- resample_est(est_1994, samp.rate = 22.05)
 
 
-dat_1994 <- read.csv("./data/raw/audio_files/yellow_naped_amazons/1994/YNA1994_504Calls.csv")
+dat_1994 <- read.csv("./data/raw/YNA1994_504Calls.csv")
 
 dat_1994$CallFile <- paste0(dat_1994$CallFile, ".wav_1")
 
@@ -145,8 +145,9 @@ est_2005 <- warbleR::selection_table(path = "./data/raw/audio_files/yellow_naped
                                       whole.recs = TRUE,
                                       extended = TRUE)
 
+est_2005 <- resample_est(est_2005, samp.rate = 22.05)
 
-dat_2005 <- read.csv("./data/raw/audio_files/yellow_naped_amazons/2005/YNA2005_1173Calls.csv")
+dat_2005 <- read.csv("./data/raw/YNA2005_1173Calls.csv")
 
 dat_2005$CallFile <- paste0(gsub("\\.aif", ".wav", dat_2005$CallFile), "_1")
 
@@ -162,11 +163,20 @@ merged_2005$Year[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <
 sf <- merged_2005$sound.files[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")]
 merged_2005$UniqueBird[grep(merged_2005$sound.files, pattern = "2005_06_03_PEAL_B")] <- paste(sapply(strsplit(sf, "_"), "[[", 4), sapply(strsplit(sf, "_"), "[[", 5), sep = "-")
 
+
+merged_2005$Site[grep(merged_2005$sound.files, pattern = "2005_06_24_SAPA_B")] <- "SAPA"
+merged_2005$Dialect[grep(merged_2005$sound.files, pattern = "2005_06_24_SAPA_B")] <- "Sou"
+merged_2005$Year[grep(merged_2005$sound.files, pattern = "2005_06_24_SAPA_B")] <- 2005
+
+# get individual from name
+sf <- merged_2005$sound.files[grep(merged_2005$sound.files, pattern = "2005_06_24_SAPA_B")]
+merged_2005$UniqueBird[grep(merged_2005$sound.files, pattern = "2005_06_24_SAPA_B")] <- paste(sapply(strsplit(sf, "_"), "[[", 4), sapply(strsplit(sf, "_"), "[[", 5), sep = "-")
+
+
 merged_2005$type <- "2005"
 merged_1994 <- merged_1994[, names(merged_2005)]
 
 yna_calls <- rbind(merged_1994, merged_2005)
-yna_calls
 
 saveRDS(yna_calls, file = "./data/processed/extended_selection_table_yna_calls.rds")
 
@@ -423,7 +433,8 @@ ggplot(yna_calls, aes(x = PC1.wpd, y = PC2.wpd, color = Site)) +
 
 # Takeaways {.unnumbered .unlisted}
 
-- MFCCs seems to do a better job at capturing the acoustic variation in thick-billed parrots calls.
+- Spectral + harmonic features do a better job at capturing the acoustic variation at the period level
+- MFCCs seems to do a better job at capturing the acoustic variation at the individual level
 
 ::: 
 
