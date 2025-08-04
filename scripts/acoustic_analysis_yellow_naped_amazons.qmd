@@ -178,6 +178,8 @@ merged_1994 <- merged_1994[, names(merged_2005)]
 
 yna_calls <- rbind(merged_1994, merged_2005)
 
+yna_calls$Dialect[yna_calls$Dialect == "Nica"] <- "Nic"
+
 saveRDS(yna_calls, file = "./data/processed/extended_selection_table_yna_calls.rds")
 
 ```
